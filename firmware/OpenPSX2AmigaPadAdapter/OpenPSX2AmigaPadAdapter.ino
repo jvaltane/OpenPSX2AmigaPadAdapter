@@ -77,6 +77,15 @@
  */
 //~ #define DISABLE_FACTORY_RESET
 
+/** \brief Enable original mouse mode change behaviour
+ * 
+ * This enables original mouse mode change with right analog move. Without this
+ * mouse mode is selectable with SELECT+R2
+ * 
+ * Disabled by default
+ */
+//~ #define ENABLE_ORIGINAL_MOUSE
+
 //! \name OUTPUT pins, connected to Amiga port
 //! @{
 const byte PIN_UP = 4;    //!< Amiga Pin 1
@@ -282,7 +291,10 @@ enum ATTR_PACKED JoyButtonMapping {
 	JMAP_RACING1,
 	JMAP_RACING2,
 	JMAP_PLATFORM,
-	JMAP_CUSTOM
+	JMAP_CUSTOM,
+#ifndef ENABLE_ORIGINAL_MOUSE
+	JMAP_MOUSE
+#endif
 };
 
 /** \brief Structure representing a standard 2-button Atari-style joystick
@@ -1833,12 +1845,14 @@ void stateMachine () {
 		 **********************************************************************/
 		case ST_JOYSTICK: {
 			int8_t dummy;
-			
+#ifdef ENABLE_ORIGINAL_MOUSE
 			if (rightAnalogMoved (dummy, dummy)) {
 				// Right analog stick moved, switch to Mouse mode
 				joystickToMouse ();
 				*state = ST_MOUSE;
-			} else if (psx.buttonPressed (PSB_SELECT)) {
+			} else
+#endif
+			if (psx.buttonPressed (PSB_SELECT)) {
 				*state = ST_SELECT_HELD;
 			} else {
 				// Handle normal joystick movements
@@ -1858,12 +1872,14 @@ void stateMachine () {
 			break;
 		case ST_CD32: {
 			int8_t dummy;
-			
+#ifdef ENABLE_ORIGINAL_MOUSE
 			if (rightAnalogMoved (dummy, dummy)) {
 				// Right analog stick moved, switch to Mouse mode
 				cd32ToMouse ();
 				*state = ST_MOUSE;
-			} else {
+			} else
+#endif
+			{
 				handleJoystickDirections (j);
 			}
 			stateEnteredTime = 0;
@@ -1959,10 +1975,21 @@ void stateMachine () {
 					joyMappingFunc = mapJoystickPlatform;
 					flashLed (JMAP_PLATFORM);
 					break;
+#ifndef ENABLE_ORIGINAL_MOUSE
+				case PSB_R2:
+					debugln (F("Setting mouse"));
+					cd32ToMouse(); /* This should work with joystick and cd32 cases */
+					flashLed (JMAP_MOUSE);
+					*state = ST_MOUSE;
+					break;
+#endif
 				case PSB_L1:
 				case PSB_R1:
 				case PSB_L2:
-				case PSB_R2: {
+#ifdef ENABLE_ORIGINAL_MOUSE
+				case PSB_R2:
+#endif
+				{
 					byte configIdx = psxButtonToIndex (selectComboButton);
 					if (configIdx < PSX_BUTTONS_NO) {
 						debug (F("Setting Custom mapping for controllerConfig "));
